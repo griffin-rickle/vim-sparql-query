@@ -3,22 +3,25 @@ import requests
 import sys
 import vim
 
-def test_query():
+def buffer_query():
+
     params = {
-        "query": """SELECT * WHERE {?s a ?o} limit 100""",
         "run": ' Run Query ',
         "timeout": 30000,
         "default_graph_uri": '',
         "format": "text/plain",
 
     }
+    buffer_query = '\n'.join(vim.current.buffer)
+    params['query'] = buffer_query
     endpoint = "https://lod.openlinksw.com/sparql/"
 
     vim.command(":new")
-    vim.command("sbNext")
+
+    # vim.command("sblast")
+    tmp_file = "/tmp/test.sq"
 
     result = requests.get(endpoint, params=params)
-    print(result.status_code)
-    print(result.text)
 
-    vim.current.buffer[:] = result.text.split('\n')
+    vim.current.window.buffer[:] = result.text.split('\n')
+    vim.current.window.buffer.options['buftype'] = 'nofile'
