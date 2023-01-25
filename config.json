@@ -1,0 +1,11 @@
+{
+    "timeout": 30000,
+    "endpoint": "https://sd-e6d123d3.stardog.cloud:5820/drinkers/query",
+    "headers": {
+        "Accept": "application/ld+json"
+    },
+    "auth": {
+        "username": "rickleg93@gmail.com",
+        "password": "Jarky#Barvis1"
+    }
+}
