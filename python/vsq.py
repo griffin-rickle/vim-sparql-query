@@ -1,11 +1,14 @@
+from io import StringIO
 import json
 import os
+import pandas as pd
 import requests
 import sys
 import vim
 
 
 results_buffer = None
+
 
 def get_config():
     python_dir_ary = sys.path[0].split(os.path.sep)
@@ -24,6 +27,17 @@ def get_query_type():
         curr_line = vim.current.buffer[curr_index]
     query_keyword = curr_line.split(' ')[0]
     return query_keyword
+
+
+def format_rdf(raw_rdf):
+    return "raw_rdf"
+
+
+def format_result(result):
+    if result.headers['Content-Type'] == 'application/ld+json':
+        return format_rdf(result.text)
+    else:
+        return pd.read_csv(StringIO(result.text)).to_string()
 
 
 def buffer_query():
@@ -48,5 +62,6 @@ def buffer_query():
         results_buffer = vim.current.buffer
 
     result = requests.post(query_endpoint, data=data, auth=auth, headers=headers)
-    results_buffer[:] = result.text.split('\n')
+    buffer_text = format_result(result)
+    results_buffer[:] = buffer_text.split('\n')
 
