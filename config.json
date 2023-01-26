@@ -1,8 +1,13 @@
 {
     "timeout": 30000,
-    "endpoint": "test_endpoint",
+    "endpoint": "endpoint",
     "headers": {
-        "Accept": "application/ld+json"
+        "SELECT": {
+            "Accept": "text/csv"
+        },
+        "CONSTRUCT": {
+            "Accept": "application/ld+json"
+        }
     },
     "auth": {
         "username": "username",
