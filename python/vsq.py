@@ -2,6 +2,7 @@ from io import StringIO
 import json
 import os
 import pandas as pd
+import rdflib
 import requests
 import sys
 import vim
@@ -30,11 +31,15 @@ def get_query_type():
 
 
 def format_rdf(raw_rdf):
-    return "raw_rdf"
+    # return json.dumps(json.loads(raw_rdf), indent=4)
+    return raw_rdf
+    # ds = rdflib.Dataset()
+    # ds.parse(data=raw_rdf, format='json-ld')
+    # return ds.serialize(format='trig')
 
 
 def format_result(result):
-    if result.headers['Content-Type'] == 'application/ld+json':
+    if result.headers['Content-Type'] == 'application/trig':
         return format_rdf(result.text)
     else:
         return pd.read_csv(StringIO(result.text)).to_string()
@@ -48,7 +53,8 @@ def buffer_query():
     auth = (endpoint_config['auth']['username'], endpoint_config['auth']['password'])
 
     data = {
-        "query": '\n'.join(vim.current.buffer)
+        "query": '\n'.join(vim.current.buffer),
+        "useNamespaces": True
     }
 
     query_type = get_query_type()
