@@ -40,10 +40,10 @@ def format_rdf(raw_rdf):
 
 
 def format_result(result):
-    if result.headers['Content-Type'] == 'application/trig':
+    if 'Content-Type' in result.headers.keys() and result.headers['Content-Type'] == 'application/trig':
         return format_rdf(result.text)
     else:
-        return pd.read_csv(StringIO(result.text)).to_string()
+        return pd.read_csv(StringIO(result.text)).to_markdown(index=False)
 
 
 def buffer_query():
@@ -56,7 +56,7 @@ def buffer_query():
 
     data = {
         "query": '\n'.join(vim.current.buffer),
-        "useNamespaces": True
+         "useNamespaces": False
     }
 
     query_type = get_query_type()
@@ -75,7 +75,7 @@ def buffer_query():
         results_buffer[:] = []
         vim.command(f":sb{results_buffer.number}")
 
-    result = requests.post(query_endpoint, data=data, auth=auth, headers=headers)
+    result = requests.get(query_endpoint, params=data, auth=auth, headers=headers)
     buffer_text = format_result(result)
     results_buffer[:] = buffer_text.split('\n')
 
