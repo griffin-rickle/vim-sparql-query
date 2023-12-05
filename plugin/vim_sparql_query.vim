@@ -25,8 +25,13 @@ function! s:get_visual_selection()
     return join(lines, "\n")
 endfunction
 
+function! NewQuery()
+    python3 vsq.new_query()
+endfunction
+
 function! BufferQuery()
     python3 vsq.buffer_query()
 endfunction
 
 command! -nargs=0 BufferQuery call BufferQuery()
+command! -nargs=0 NewQuery call NewQuery()

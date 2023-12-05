@@ -1,12 +1,17 @@
+import datetime
+import csv
 from io import StringIO
 import json
 import os
-import pandas as pd
-import rdflib
+# import pandas as pd
+# import rdflib
+import re
 import requests
 import sys
 import textwrap
 import vim
+from mdtable import MDTable
+import concurrent.futures
 
 
 results_buffer = None
@@ -44,11 +49,21 @@ def format_result(result):
     if 'Content-Type' in result.headers.keys() and result.headers['Content-Type'] == 'application/trig':
         return format_rdf(result.text)
     else:
-        df = pd.read_csv(StringIO(result.text))
-        num_df_columns = len(df.columns)
-        num_buffer_columns = vim.current.window.width
-        df = df.applymap(lambda x: '\n'.join(textwrap.wrap(x, int(num_buffer_columns/num_df_columns))))
-        return df.to_markdown(index=False)
+        markdown = MDTable(StringIO(result.text))
+        output = StringIO()
+        output.write(markdown.get_table())
+        return output.getvalue()
+
+
+def submit_query(query_endpoint, data, auth, headers):
+    result = requests.get(query_endpoint, params=data, auth=auth, headers=headers)
+    return result
+
+
+def set_buffer_text(completed_future):
+    result = completed_future.result()
+    buffer_text = format_result(result)
+    results_buffer[:] = buffer_text.split('\n')
 
 
 def buffer_query():
@@ -61,6 +76,7 @@ def buffer_query():
 
     data = {
         "query": '\n'.join(vim.current.buffer),
+        "timeout": 0,
         "useNamespaces": True
     }
 
@@ -79,8 +95,15 @@ def buffer_query():
     elif results_buffer.options['bufhidden'] == b'h' or results_buffer.options['bufhidden'] == b'':
         results_buffer[:] = []
         vim.command(f":sb{results_buffer.number}")
+    vim.command(':set nowrap')
 
-    result = requests.get(query_endpoint, params=data, auth=auth, headers=headers)
-    buffer_text = format_result(result)
-    results_buffer[:] = buffer_text.split('\n')
+    results_buffer[:] = ["Query submitted", str(datetime.datetime.now())]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        result = executor.submit(submit_query, query_endpoint, data, auth, headers)
+        result.add_done_callback(set_buffer_text)
 
+
+def new_query():
+    vim.command('set hidden')
+    vim.command(':vnew')
+    vim.command('set syntax=sparql')
