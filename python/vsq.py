@@ -1,14 +1,9 @@
 import datetime
-import csv
 from io import StringIO
 import json
 import os
-# import pandas as pd
-# import rdflib
-import re
 import requests
 import sys
-import textwrap
 import vim
 from mdtable import MDTable
 import concurrent.futures
@@ -16,6 +11,15 @@ import concurrent.futures
 
 results_buffer = None
 results_buffer_idx = None
+
+
+query_type_method = {
+    'SELECT': requests.get,
+    'ASK': requests.get,
+    'CONSTRUCT': requests.get,
+    'INSERT': requests.post,
+    'DELETE': requests.post
+}
 
 
 def get_config():
@@ -55,15 +59,21 @@ def format_result(result):
         return output.getvalue()
 
 
-def submit_query(query_endpoint, data, auth, headers):
-    result = requests.get(query_endpoint, params=data, auth=auth, headers=headers)
+def submit_query(request_method, query_endpoint, data, auth, headers):
+    result = request_method(query_endpoint, params=data, auth=auth, headers=headers)
     return result
 
 
-def set_buffer_text(completed_future):
+def set_buffer_text(completed_future, query_type):
     result = completed_future.result()
-    buffer_text = format_result(result)
-    results_buffer[:] = buffer_text.split('\n')
+    if query_type in ["ASK", "SELECT", "CONSTRUCT"]:
+        buffer_text = format_result(result)
+        results_buffer[:] = buffer_text.split('\n')
+    else:
+        if result.status_code == 200:
+            print("Database was successfully updated")
+        else:
+            print(f"ERROR {str(result.status_code)}: result.text")
 
 
 def buffer_query():
@@ -81,9 +91,8 @@ def buffer_query():
     }
 
     query_type = get_query_type()
-    headers = {}
-    if query_type in endpoint_config['headers'].keys():
-        headers = endpoint_config['headers'][query_type]
+    headers = endpoint_config.get(query_type, {}).get("headers", {})
+    endpoint_suffix = endpoint_config.get(query_type, {}).get("endpoint", "")
 
     # if results_buffer hasn't been instantiated yet or the buffer had previously been closed, want
     # to create a new buffer and use that.
@@ -97,10 +106,10 @@ def buffer_query():
         vim.command(f":sb{results_buffer.number}")
     vim.command(':set nowrap')
 
-    results_buffer[:] = ["Query submitted", str(datetime.datetime.now())]
+    # results_buffer[:] = ["Query submitted", str(datetime.datetime.now())]
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        result = executor.submit(submit_query, query_endpoint, data, auth, headers)
-        result.add_done_callback(set_buffer_text)
+        result = executor.submit(submit_query, query_type_method[query_type], query_endpoint + endpoint_suffix, data, auth, headers)
+        result.add_done_callback(lambda x: set_buffer_text(x, query_type))
 
 
 def new_query():
