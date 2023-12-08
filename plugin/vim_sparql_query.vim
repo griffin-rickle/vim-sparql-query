@@ -1,3 +1,4 @@
+let g:python3_host_prog=$HOME.'.venv/bin/python3'
 let s:plugin_root_dir = fnamemodify(resolve(expand('<sfile>:p')), ':h')
 
 if executable('python3')
@@ -29,8 +30,31 @@ function! NewQuery()
     python3 vsq.new_query()
 endfunction
 
+function! GetPythonExecutable()
+    if filereadable($HOME."/.pyenv/shims/python3")
+        return $HOME."/.pyenv/shims/python3"
+    endif
+    return 'python3'
+endfunction
+
+function! ClearQueryResults()
+    if bufwinnr("QueryResults") < 0
+        return
+    endif
+
+    execute("buffer QueryResults")
+    execute("normal ggdG")
+endfunction
+
+let s:python_executable = GetPythonExecutable()
 function! BufferQuery()
-    python3 vsq.buffer_query()
+    let s:query_buffer = bufnr("%")
+    call ClearQueryResults()
+    execute("buffer "..s:query_buffer)
+    let s:job = job_start([s:python_executable, s:plugin_root_dir . '/../python/vsq.py'], {'out_io': 'buffer', 'out_name': 'QueryResults', 'in_io': 'buffer', 'in_buf': s:query_buffer, 'pty': 0, 'out_msg': 0, 'err_io': 'out'})
+    if bufwinnr('QueryResults') < 0
+        execute "sb QueryResults"
+    endif
 endfunction
 
 command! -nargs=0 BufferQuery call BufferQuery()

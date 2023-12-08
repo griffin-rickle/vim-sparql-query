@@ -4,9 +4,7 @@ import json
 import os
 import requests
 import sys
-import vim
 from mdtable import MDTable
-import concurrent.futures
 
 
 results_buffer = None
@@ -31,22 +29,19 @@ def get_config():
     return config
 
 
-def get_query_type():
+def get_query_type(query):
+    lines = query.split('\n')
     curr_index = 0
-    curr_line = vim.current.buffer[0]
-    while curr_index < len(vim.current.buffer) and curr_line.startswith('#'):
+    curr_line = lines[0]
+    while curr_index < len(lines) and curr_line.startswith('#'):
         curr_index += 1
-        curr_line = vim.current.buffer[curr_index]
+        curr_line = lines[curr_index]
     query_keyword = curr_line.split(' ')[0]
     return query_keyword
 
 
 def format_rdf(raw_rdf):
-    # return json.dumps(json.loads(raw_rdf), indent=4)
     return raw_rdf
-    # ds = rdflib.Dataset()
-    # ds.parse(data=raw_rdf, format='json-ld')
-    # return ds.serialize(format='trig')
 
 
 def format_result(result):
@@ -64,19 +59,18 @@ def submit_query(request_method, query_endpoint, data, auth, headers):
     return result
 
 
-def set_buffer_text(completed_future, query_type):
-    result = completed_future.result()
+def set_buffer_text(result, query_type):
     if query_type in ["ASK", "SELECT", "CONSTRUCT"]:
         buffer_text = format_result(result)
-        results_buffer[:] = buffer_text.split('\n')
+        print(buffer_text)
     else:
         if result.status_code == 200:
             print("Database was successfully updated")
         else:
-            print(f"ERROR {str(result.status_code)}: result.text")
+            print(f"ERROR {str(result.status_code)}: {result.text}")
 
 
-def buffer_query():
+def buffer_query(query):
     global results_buffer
     global results_buffer_idx
     endpoint_config = get_config()
@@ -85,34 +79,21 @@ def buffer_query():
     auth = (endpoint_config['auth']['username'], endpoint_config['auth']['password'])
 
     data = {
-        "query": '\n'.join(vim.current.buffer),
+        "query": query,
         "timeout": 0,
         "useNamespaces": True
     }
 
-    query_type = get_query_type()
+    query_type = get_query_type(query)
     headers = endpoint_config.get(query_type, {}).get("headers", {})
     endpoint_suffix = endpoint_config.get(query_type, {}).get("endpoint", "")
 
-    # if results_buffer hasn't been instantiated yet or the buffer had previously been closed, want
-    # to create a new buffer and use that.
-    if results_buffer is None:
-        vim.command(":new")
-        vim.current.window.buffer.options['buftype'] = 'nofile'
-        results_buffer = vim.current.buffer
-        results_buffer_idx = vim.current.buffer.number
-    elif results_buffer.options['bufhidden'] == b'h' or results_buffer.options['bufhidden'] == b'':
-        results_buffer[:] = []
-        vim.command(f":sb{results_buffer.number}")
-    vim.command(':set nowrap')
-
-    # results_buffer[:] = ["Query submitted", str(datetime.datetime.now())]
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        result = executor.submit(submit_query, query_type_method[query_type], query_endpoint + endpoint_suffix, data, auth, headers)
-        result.add_done_callback(lambda x: set_buffer_text(x, query_type))
+    print("Query submitted", str(datetime.datetime.now()))
+    result = submit_query(query_type_method[query_type], query_endpoint + endpoint_suffix, data, auth, headers)
+    set_buffer_text(result, query_type)
 
 
-def new_query():
-    vim.command('set hidden')
-    vim.command(':vnew')
-    vim.command('set syntax=sparql')
+if __name__ == "__main__":
+    lines = [line for line in sys.stdin.readlines()]
+    input_string = ''.join(lines)
+    buffer_query(input_string)
