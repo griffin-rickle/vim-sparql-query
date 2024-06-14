@@ -1,33 +1,19 @@
-let g:python3_host_prog=$HOME.'.venv/bin/python3'
 let s:plugin_root_dir = fnamemodify(resolve(expand('<sfile>:p')), ':h')
-
-if executable('python3')
-python3 << EOF
-import sys
-from os.path import normpath, join
-import vim
-plugin_root_dir = vim.eval('s:plugin_root_dir')
-python_root_dir = normpath(join(plugin_root_dir, '..', 'python'))
-sys.path.insert(0, python_root_dir)
-import vsq
-EOF
-endif
-
-function! s:get_visual_selection()
-    " Why is this not a built-in Vim script function?!
-    let [line_start, column_start] = getpos("'<")[1:2]
-    let [line_end, column_end] = getpos("'>")[1:2]
-    let lines = getline(line_start, line_end)
-    if len(lines) == 0
-        return ''
-    endif
-    let lines[-1] = lines[-1][: column_end - (&selection == 'inclusive' ? 1 : 2)]
-    let lines[0] = lines[0][column_start - 1:]
-    return join(lines, "\n")
-endfunction
+python3 import vim_sparql_query.vsq as vsq
 
 function! NewQuery()
     python3 vsq.new_query()
+endfunction
+
+function! PrintError(job_id, data, event)
+    echo "Error! Error!"
+    echo a:data
+endfunction
+
+function! PrintResults(job_id, data, event)
+    call ClearQueryResults()
+    call appendbufline('QueryResults', 0, a:data)
+    execute("normal gg")
 endfunction
 
 function! GetPythonExecutable()
@@ -39,22 +25,23 @@ endfunction
 
 function! ClearQueryResults()
     if bufwinnr("QueryResults") < 0
-        return
+       call bufnr("QueryResults", 1)
     endif
-
-    execute("buffer QueryResults")
+    execute("sb QueryResults")
     execute("normal ggdG")
+    call setbufvar('QueryResults', '&buftype', 'nofile')
+    call setbufvar('QueryResults', '&wrap', 0)
 endfunction
+
+
 
 let s:python_executable = GetPythonExecutable()
 function! BufferQuery()
-    let s:query_buffer = bufnr("%")
-    call ClearQueryResults()
-    execute("buffer "..s:query_buffer)
-    let s:job = job_start([s:python_executable, s:plugin_root_dir . '/../python/vsq.py'], {'out_io': 'buffer', 'out_name': 'QueryResults', 'in_io': 'buffer', 'in_buf': s:query_buffer, 'pty': 0, 'out_msg': 0, 'err_io': 'out'})
-    if bufwinnr('QueryResults') < 0
-        execute "sb QueryResults"
-    endif
+    let s:job_id = jobstart([g:python3_host_prog, s:plugin_root_dir . '/../python3/vim_sparql_query/vsq.py'], {'stdin': 'pipe', 'stdout_buffered': 1, 'on_stdout':function('PrintResults'), 'on_stderr': function('PrintError')})
+    for s:query_line in getline(1, '$')
+        call chansend(s:job_id, s:query_line . '\n')
+    endfor
+    call chanclose(s:job_id, 'stdin')
 endfunction
 
 command! -nargs=0 BufferQuery call BufferQuery()

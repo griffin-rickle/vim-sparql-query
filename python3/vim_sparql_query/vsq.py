@@ -6,11 +6,6 @@ import requests
 import sys
 from mdtable import MDTable
 
-
-results_buffer = None
-results_buffer_idx = None
-
-
 query_type_method = {
     'SELECT': requests.get,
     'ASK': requests.get,
@@ -71,8 +66,7 @@ def set_buffer_text(result, query_type):
 
 
 def buffer_query(query):
-    global results_buffer
-    global results_buffer_idx
+
     endpoint_config = get_config()
 
     query_endpoint = endpoint_config['endpoint']
@@ -95,5 +89,5 @@ def buffer_query(query):
 
 if __name__ == "__main__":
     lines = [line for line in sys.stdin.readlines()]
-    input_string = ''.join(lines)
+    input_string = ''.join([line.replace('\\n', '\n') for line in lines])
     buffer_query(input_string)
